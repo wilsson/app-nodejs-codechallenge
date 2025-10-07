@@ -1,17 +1,23 @@
-import { Transaction as TransactionDatabase } from '@prisma/client';
+import { EventStore, Transaction as TransactionDatabase } from '@prisma/client';
 import { Transaction } from '../domain/payments';
 import { TransactionResponseDTO } from '../useCases/getTransaction/getTransaction.dto';
 
+type TransactionWithEvents = TransactionDatabase & {
+  events?: EventStore[];
+};
+
 export class PaymentsMapper {
-  static toDomain(raw: TransactionDatabase): Transaction {
+  static toDomain(raw: TransactionWithEvents): Transaction {
+    const lastEvent = raw.events?.[0];
+
     return Transaction.create({
       id: raw?.id,
       tranferTypeId: raw?.tranfer_type_id,
       accountExternalIdCredit: raw?.account_external_id_credit,
       accountExternalIdDebit: raw?.account_external_id_debit,
       value: raw?.value,
-      status: raw?.status,
       createAt: raw?.created_at,
+      status: lastEvent?.status!,
     });
   }
 

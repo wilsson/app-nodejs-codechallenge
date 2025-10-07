@@ -3,6 +3,7 @@ import { PrismaService } from 'src/utils/prisma';
 import { PaymentsMapper } from 'src/payments/mappers/payments.mapper';
 import { Transaction } from 'src/payments/domain/payments';
 import { UpdateTransactionDTO } from 'src/payments/useCases/updateTransaction/updateTransaciton.dto';
+import { TransactionStatus } from '@prisma/client';
 
 describe('PostgresqlRepository', () => {
   let repository: PostgresqlRepository;
@@ -14,7 +15,9 @@ describe('PostgresqlRepository', () => {
         create: jest.fn(),
         findUnique: jest.fn(),
         findFirst: jest.fn(),
-        update: jest.fn(),
+      },
+      eventStore: {
+        create: jest.fn(),
       },
     } as unknown as PrismaService;
 
@@ -26,15 +29,19 @@ describe('PostgresqlRepository', () => {
   });
 
   describe('saveTransaction', () => {
-    it('should call prisma.create and map to domain', async () => {
+    it('should create transaction with initial event', async () => {
       const transaction = {
         accountExternalIdDebit: 'a',
         accountExternalIdCredit: 'b',
         value: 100,
         tranferTypeId: 1,
-        status: 'PENDING',
+        status: TransactionStatus.PENDING,
       } as Transaction;
-      (prisma.transaction!.create as jest.Mock).mockResolvedValue(transaction);
+
+      const dbTransaction = { id: 'tx-123' };
+      (prisma.transaction!.create as jest.Mock).mockResolvedValue(
+        dbTransaction,
+      );
 
       const result = await repository.saveTransaction(transaction);
 
@@ -44,23 +51,34 @@ describe('PostgresqlRepository', () => {
           account_external_id_credit: transaction.accountExternalIdCredit,
           value: transaction.value,
           tranfer_type_id: transaction.tranferTypeId,
-          status: transaction.status,
+          events: {
+            create: {
+              status: transaction.status,
+            },
+          },
         },
       });
-      expect(PaymentsMapper.toDomain).toHaveBeenCalledWith(transaction);
-      expect(result).toEqual(transaction);
+
+      expect(PaymentsMapper.toDomain).toHaveBeenCalledWith(dbTransaction);
+      expect(result).toEqual(dbTransaction);
     });
   });
 
   describe('getTransaction', () => {
     it('should return mapped transaction when found', async () => {
-      const raw = { id: '123' };
+      const raw = { id: '123', events: [] };
       (prisma.transaction!.findUnique as jest.Mock).mockResolvedValue(raw);
 
       const result = await repository.getTransaction('123');
 
       expect(prisma.transaction!.findUnique).toHaveBeenCalledWith({
         where: { id: '123' },
+        include: {
+          events: {
+            orderBy: { created_at: 'desc' },
+            take: 1,
+          },
+        },
       });
       expect(PaymentsMapper.toDomain).toHaveBeenCalledWith(raw);
       expect(result).toEqual(raw);
@@ -77,13 +95,19 @@ describe('PostgresqlRepository', () => {
 
   describe('getTransactionByIdempotencyKey', () => {
     it('should return mapped transaction when found', async () => {
-      const raw = { id: '123' };
+      const raw = { id: '123', events: [] };
       (prisma.transaction!.findFirst as jest.Mock).mockResolvedValue(raw);
 
       const result = await repository.getTransactionByIdempotencyKey('key-123');
 
       expect(prisma.transaction!.findFirst).toHaveBeenCalledWith({
         where: { account_external_id_debit: 'key-123' },
+        include: {
+          events: {
+            orderBy: { created_at: 'desc' },
+            take: 1,
+          },
+        },
       });
       expect(PaymentsMapper.toDomain).toHaveBeenCalledWith(raw);
       expect(result).toEqual(raw);
@@ -99,18 +123,22 @@ describe('PostgresqlRepository', () => {
   });
 
   describe('updateTransaction', () => {
-    it('should call prisma.update with correct parameters', async () => {
+    it('should insert a new event for transaction status', async () => {
       const dto: UpdateTransactionDTO = {
         id: '123',
-        status: 'REJECTED',
+        status: TransactionStatus.REJECTED,
         value: 200,
       };
 
+      (prisma.eventStore!.create as jest.Mock).mockResolvedValue({});
+
       await repository.updateTransaction(dto);
 
-      expect(prisma.transaction!.update).toHaveBeenCalledWith({
-        where: { id: dto.id },
-        data: { status: dto.status },
+      expect(prisma.eventStore!.create).toHaveBeenCalledWith({
+        data: {
+          transaction_id: dto.id,
+          status: dto.status,
+        },
       });
     });
   });

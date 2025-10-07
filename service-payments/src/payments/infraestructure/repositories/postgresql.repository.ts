@@ -1,3 +1,4 @@
+import { TransactionStatus } from '@prisma/client';
 import { Transaction } from 'src/payments/domain/payments';
 import { PaymentsRepository } from 'src/payments/domain/payments.repository';
 import { PaymentsMapper } from 'src/payments/mappers/payments.mapper';
@@ -14,7 +15,11 @@ export class PostgresqlRepository implements PaymentsRepository {
         account_external_id_credit: transaction?.accountExternalIdCredit,
         value: transaction?.value,
         tranfer_type_id: transaction?.tranferTypeId,
-        status: transaction?.status,
+        events: {
+          create: {
+            status: TransactionStatus.PENDING,
+          },
+        },
       },
     });
     return PaymentsMapper.toDomain(result);
@@ -24,6 +29,14 @@ export class PostgresqlRepository implements PaymentsRepository {
     const result = await this.prisma.transaction.findUnique({
       where: {
         id,
+      },
+      include: {
+        events: {
+          orderBy: {
+            created_at: 'desc',
+          },
+          take: 1,
+        },
       },
     });
     if (!result) return null;
@@ -37,17 +50,23 @@ export class PostgresqlRepository implements PaymentsRepository {
       where: {
         account_external_id_debit: id,
       },
+      include: {
+        events: {
+          orderBy: {
+            created_at: 'desc',
+          },
+          take: 1,
+        },
+      },
     });
     if (!result) return null;
     return PaymentsMapper.toDomain(result);
   }
 
   async updateTransaction(dto: UpdateTransactionDTO): Promise<void> {
-    await this.prisma.transaction.update({
-      where: {
-        id: dto?.id,
-      },
+    await this.prisma.eventStore.create({
       data: {
+        transaction_id: dto?.id,
         status: dto?.status,
       },
     });

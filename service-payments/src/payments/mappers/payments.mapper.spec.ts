@@ -1,17 +1,33 @@
 import { PaymentsMapper } from './payments.mapper';
 import { Transaction } from '../domain/payments';
 import { TransactionStatus } from '@prisma/client';
-import type { Transaction as TransactionDatabase } from '@prisma/client';
+import type {
+  EventStore,
+  Transaction as TransactionDatabase,
+} from '@prisma/client';
 import { TransactionResponseDTO } from '../useCases/getTransaction/getTransaction.dto';
 
+type TransactionWithEvents = TransactionDatabase & {
+  events?: EventStore[];
+};
+
 describe('PaymentsMapper', () => {
-  const rawDatabaseTransaction: TransactionDatabase = {
+  const now = new Date();
+  const rawDatabaseTransaction: TransactionWithEvents = {
     id: 'id',
     tranfer_type_id: 1,
     account_external_id_debit: 'acc-debit-123',
     account_external_id_credit: 'acc-credit-123',
     value: 100,
-    status: TransactionStatus.PENDING,
+    events: [
+      {
+        id: 'event-1',
+        transaction_id: 'id',
+        status: TransactionStatus.APPROVED,
+        created_at: now,
+        updated_at: now,
+      },
+    ],
     created_at: new Date(),
     updated_at: new Date(),
   };
@@ -33,7 +49,9 @@ describe('PaymentsMapper', () => {
       rawDatabaseTransaction.account_external_id_credit,
     );
     expect(domainTransaction.value).toBe(rawDatabaseTransaction.value);
-    expect(domainTransaction.status).toBe(rawDatabaseTransaction.status);
+    expect(domainTransaction.status).toBe(
+      rawDatabaseTransaction.events![0].status,
+    );
     expect(domainTransaction.createAt).toBe(rawDatabaseTransaction.created_at);
   });
 
@@ -45,7 +63,7 @@ describe('PaymentsMapper', () => {
       accountExternalIdCredit:
         rawDatabaseTransaction.account_external_id_credit,
       value: rawDatabaseTransaction.value,
-      status: rawDatabaseTransaction.status,
+      status: rawDatabaseTransaction.events![0].status,
       createAt: rawDatabaseTransaction.created_at,
     });
 
