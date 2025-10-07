@@ -8,6 +8,7 @@ type TransactionWithEvents = TransactionDatabase & {
 
 export class PaymentsMapper {
   static toDomain(raw: TransactionWithEvents): Transaction {
+    console.log('raw', raw);
     const lastEvent = raw.events?.[0];
 
     return Transaction.create({

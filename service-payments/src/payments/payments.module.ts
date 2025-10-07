@@ -9,6 +9,7 @@ import { PaymentRejectedConsumerController } from './infraestructure/messaging/k
 import { PaymentApprovedConsumerController } from './infraestructure/messaging/kafka/paymentApprovedConsumer.controller';
 import { UpdateTransactionUseCase } from './useCases/updateTransaction/updateTransaction.usecase';
 import { RedisLockRepository } from './infraestructure/cache/redis/redis.repository';
+import { PaymentsResolver } from './infraestructure/graphql/payments.resolver';
 
 const paymentsRepository = {
   provide: 'PAYMENTS_REPOSITORY',
@@ -21,6 +22,7 @@ const paymentsRepository = {
 @Module({
   imports: [],
   providers: [
+    PaymentsResolver,
     RedisLockRepository,
     paymentsRepository,
     CreateTransactionUseCase,
