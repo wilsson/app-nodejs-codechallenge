@@ -10,9 +10,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
 
 import { Global, Module } from '@nestjs/common';
 
-@Global() // 👈 esto lo hace disponible globalmente
+@Global()
 @Module({
   providers: [PrismaService],
-  exports: [PrismaService], // 👈 permite que otros módulos lo usen
+  exports: [PrismaService],
 })
 export class PrismaModule {}

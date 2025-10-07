@@ -19,7 +19,8 @@ export class CreateTransactionController {
   @Post()
   async create(@Body() body: CreateTransactionDTO) {
     try {
-      await this.createTransactionUseCase.execute(body);
+      const result = await this.createTransactionUseCase.execute(body);
+      return result;
     } catch (error) {
       if (error instanceof TransactionAlreadyExistError) {
         throw new ConflictException(error.message);

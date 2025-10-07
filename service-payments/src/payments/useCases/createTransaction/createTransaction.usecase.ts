@@ -57,6 +57,7 @@ export class CreateTransactionUseCase {
         await this.repository.saveTransaction(transaction);
 
       this.kafka.emit('payment.created', JSON.stringify(saveTransaction));
+      return { id: saveTransaction?.id };
     } finally {
       await this.redisLockRepository.releaseLock(
         request?.accountExternalIdDebit,
